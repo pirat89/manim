@@ -1,0 +1,7 @@
+#!/usr/bin/bash
+podman run -ti --rm --name mymanim \
+    -v "/home/pstodulk/Films/manim:/output:Z" \
+    -v "$PWD:/input:ro,Z" \
+    -w "/input" \
+    manim-img $@
+
