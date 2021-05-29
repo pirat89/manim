@@ -3,12 +3,27 @@
 MANIM_RES_DIR="$HOME/Films/manim"
 PODMAN_IMG_NAME="manim-img"
 
+get_movie_file() {
+  #
+  # Print the last created/modified file under MANIM_RES_DIR if it is mp4
+  #
+  # The last modified/created file undert MANIM_RES_DIR is usually the movie
+  # file in the mp4 format (the default format). In case the last updated file
+  # doesn't have the mp4 extension, nothing is printed.
+  #
+  # Return 0 if the file has been found. Otherwise return 1.
+  local movie_file
+  movie_file="$(find "$MANIM_RES_DIR" -printf "%T+ %p\n" | sort | tail -n1 | cut -d " " -f2-)"
+  echo "$movie_file" | grep "\.mp4$"
+}
+
+
 [ -e "$MANIM_RES_DIR" ] || {
     echo >&2 "[Info]  Creating default manim dir: $MANIM_RES_DIR"
     mkdir -p "$MANIM_RES_DIR"
 }
 
-podman images --noheading --format "{{ .Repository }}" "$PODMAN_IMG_NAME" | grep -q "/manim-img$"
+podman images --noheading --format "{{ .Repository }}" "$PODMAN_IMG_NAME" | grep -q "/$PODMAN_IMG_NAME$"
 [ $? -ne 0 ] && {
   echo >&2 "[Error] The $MANIM_RES_DIR podman image doesn't exist yet."
   echo >&2 "        Build it manually from the git repository."
@@ -20,5 +35,18 @@ podman run -ti --rm --name mymanim \
     -v "$MANIM_RES_DIR:/output:Z" \
     -v "$PWD:/input:ro,Z" \
     -w "/input" \
-    "$PODMAN_IMG_NAME" $@
+    "$PODMAN_IMG_NAME" $@ || exit $?
 
+[ "$MANIM_PLAY" == "1" ] && {
+  movie_file=$(get_movie_file)
+  [ $? -ne 0 ] && {
+    echo >&2 "[Error] The movie file has not been discovered."
+    echo >&2 "        Maybe the output format is not mp4?"
+    exit 1
+  }
+  command -v cvlc || {
+    echo >&2 "[Error] The cvlc is not installed."
+    exit 1
+  }
+  cvlc --play-and-exit "$movie_file"
+}
